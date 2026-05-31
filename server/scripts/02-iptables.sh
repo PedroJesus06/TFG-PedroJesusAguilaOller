@@ -40,6 +40,15 @@ sudo iptables -A INPUT -p tcp --dport 22 -j ACCEPT
 sudo iptables -A INPUT -p tcp --dport 80 -j ACCEPT
 sudo iptables -A INPUT -p tcp --dport 443 -j ACCEPT
 
+#Estas reglas interesan tenerlas activas en vez de las anteriores, para que solo permitan tráfico desde la IP pública del router deseado,
+#pero interesa si trabajas haciendo pruebas desde distintos sitios, o si el router no tiene IP fija y no quieres quedarte fuera del servidor por un cambio de IP.
+# Permitir acceso SSH (Puerto 22) SOLO desde la IP publica del router deseado
+#sudo iptables -A INPUT -p tcp -s "$IP_INSTITUTO" --dport 22 -j ACCEPT
+
+# Permitir Web (HTTP puerto 80 y HTTPS puerto 443) SOLO desde la IP publica del router deseado
+#sudo iptables -A INPUT -p tcp -s "$IP_INSTITUTO" --dport 80 -j ACCEPT
+#sudo iptables -A INPUT -p tcp -s "$IP_INSTITUTO" --dport 443 -j ACCEPT
+
 echo "====================================="
 echo " LIMITANDO ICMP (PING) "
 echo "====================================="
