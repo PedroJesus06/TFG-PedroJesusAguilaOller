@@ -1,51 +1,135 @@
 #!/bin/bash
-set -e
 
-echo "====================================================="
-echo "  ORQUESTRADOR MYSQL SIMPLIFICADO FIABLE (.ENV)     "
-echo "====================================================="
+echo "====================================="
+echo " CARGANDO VARIABLES DE ENTORNO "
+echo "====================================="
 
-# 1. Cargamos el archivo .env directamente
-source .env
+# Carga las variables del archivo .env
+source ../.env
 
-# Exportamos para asegurar que sudo lea las variables correctamente
-export DIR_BBDD NAME_DB_RRHH NAME_DB_TIENDA DB_ADMIN_USER DB_ADMIN_PASS DB_LIMIT_USER DB_LIMIT_PASS SQL_RRHH SQL_TIENDA
 
-# =====================================================
-# 2. GESTIÓN Y CREACIÓN DE LOS USUARIOS
-# =====================================================
-echo "[+] Configurando usuarios en el sistema..."
+echo "====================================="
+echo " INICIANDO SERVICIO MYSQL "
+echo "====================================="
 
+# Inicia el servicio MySQL
+sudo systemctl start mysql
+
+# Habilita MySQL al iniciar el sistema
+sudo systemctl enable mysql
+
+
+echo "====================================="
+echo " ELIMINANDO BASES DE DATOS ANTERIORES "
+echo "====================================="
+
+# Elimina la base de datos RRHH si ya existe
+sudo mysql -e "DROP DATABASE IF EXISTS ${NAME_DB_RRHH};"
+
+# Elimina la base de datos TIENDA si ya existe
+sudo mysql -e "DROP DATABASE IF EXISTS ${NAME_DB_TIENDA};"
+
+
+echo "====================================="
+echo " ELIMINANDO USUARIOS ANTERIORES "
+echo "====================================="
+
+# Elimina el usuario administrador anterior
 sudo mysql -e "DROP USER IF EXISTS '${DB_ADMIN_USER}'@'localhost';"
+
+# Elimina el usuario limitado anterior
+sudo mysql -e "DROP USER IF EXISTS '${DB_LIMIT_USER}'@'localhost';"
+
+
+echo "====================================="
+echo " CREANDO BASES DE DATOS "
+echo "====================================="
+
+# Crea la base de datos RRHH
+sudo mysql -e "CREATE DATABASE ${NAME_DB_RRHH};"
+
+# Crea la base de datos TIENDA
+sudo mysql -e "CREATE DATABASE ${NAME_DB_TIENDA};"
+
+
+echo "====================================="
+echo " CREANDO USUARIO ADMINISTRADOR "
+echo "====================================="
+
+# Crea el usuario administrador
 sudo mysql -e "CREATE USER '${DB_ADMIN_USER}'@'localhost' IDENTIFIED BY '${DB_ADMIN_PASS}';"
 
-sudo mysql -e "DROP USER IF EXISTS '${DB_LIMIT_USER}'@'localhost';"
+# Asigna control total sobre ambas bases de datos
+sudo mysql -e "GRANT ALL PRIVILEGES ON ${NAME_DB_RRHH}.* TO '${DB_ADMIN_USER}'@'localhost';"
+
+sudo mysql -e "GRANT ALL PRIVILEGES ON ${NAME_DB_TIENDA}.* TO '${DB_ADMIN_USER}'@'localhost';"
+
+
+echo "====================================="
+echo " CREANDO USUARIO LIMITADO "
+echo "====================================="
+
+# Crea el usuario utilizado por la aplicación web
 sudo mysql -e "CREATE USER '${DB_LIMIT_USER}'@'localhost' IDENTIFIED BY '${DB_LIMIT_PASS}';"
 
-# =====================================================
-# 3. DESPLIEGUE Y ASIGNACIÓN DE LA BBDD RRHH
-# =====================================================
-echo "[+] Importando base de datos: ${SQL_RRHH}"
-sudo mysql < "${DIR_BBDD}/${SQL_RRHH}"
+# Asigna permisos limitados sobre la base de datos RRHH
+sudo mysql -e "GRANT SELECT, INSERT, UPDATE ON ${NAME_DB_RRHH}.* TO '${DB_LIMIT_USER}'@'localhost';"
 
-echo "[+] Asignando permisos para: ${NAME_DB_RRHH}"
-sudo mysql -e "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER ON \`${NAME_DB_RRHH}\`.* TO '${DB_ADMIN_USER}'@'localhost';"
-sudo mysql -e "GRANT SELECT, INSERT, UPDATE ON \`${NAME_DB_RRHH}\`.* TO '${DB_LIMIT_USER}'@'localhost';"
+# Asigna permisos limitados sobre la base de datos TIENDA
+sudo mysql -e "GRANT SELECT, INSERT, UPDATE ON ${NAME_DB_TIENDA}.* TO '${DB_LIMIT_USER}'@'localhost';"
 
-# =====================================================
-# 4. DESPLIEGUE Y ASIGNACIÓN DE LA BBDD TIENDA
-# =====================================================
-echo "[+] Importando base de datos: ${SQL_TIENDA}"
-sudo mysql < "${DIR_BBDD}/${SQL_TIENDA}"
 
-echo "[+] Asignando permisos para: ${NAME_DB_TIENDA}"
-sudo mysql -e "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER ON \`${NAME_DB_TIENDA}\`.* TO '${DB_ADMIN_USER}'@'localhost';"
-sudo mysql -e "GRANT SELECT, INSERT, UPDATE ON \`${NAME_DB_TIENDA}\`.* TO '${DB_LIMIT_USER}'@'localhost';"
+echo "====================================="
+echo " ACTUALIZANDO PRIVILEGIOS MYSQL "
+echo "====================================="
 
-# =====================================================
-# 5. APLICAR CAMBIOS
-# =====================================================
+# Recarga los permisos de MySQL
 sudo mysql -e "FLUSH PRIVILEGES;"
-echo "====================================================="
-echo "[+] ¡Despliegue multiusuario completado con éxito!  "
-echo "====================================================="
+
+
+echo "====================================="
+echo " IMPORTANDO ARCHIVOS SQL "
+echo "====================================="
+
+# Importa la base de datos RRHH
+sudo mysql ${NAME_DB_RRHH} < ${DIR_BBDD}/${SQL_RRHH}
+
+# Importa la base de datos TIENDA
+sudo mysql ${NAME_DB_TIENDA} < ${DIR_BBDD}/${SQL_TIENDA}
+
+
+echo "====================================="
+echo " VERIFICANDO BASES DE DATOS "
+echo "====================================="
+
+# Muestra las bases de datos existentes
+sudo mysql -e "SHOW DATABASES;"
+
+
+echo "====================================="
+echo " VERIFICANDO USUARIOS MYSQL "
+echo "====================================="
+
+# Muestra los usuarios creados
+sudo mysql -e "SELECT user, host FROM mysql.user;"
+
+
+echo "====================================="
+echo " VERIFICANDO TABLAS RRHH "
+echo "====================================="
+
+# Muestra tablas de la base de datos RRHH
+sudo mysql -e "USE ${NAME_DB_RRHH}; SHOW TABLES;"
+
+
+echo "====================================="
+echo " VERIFICANDO TABLAS TIENDA "
+echo "====================================="
+
+# Muestra tablas de la base de datos TIENDA
+sudo mysql -e "USE ${NAME_DB_TIENDA}; SHOW TABLES;"
+
+
+echo "====================================="
+echo " MYSQL CONFIGURADO CORRECTAMENTE "
+echo "====================================="

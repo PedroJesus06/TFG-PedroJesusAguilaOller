@@ -1,5 +1,4 @@
 #!/bin/bash
-# Salir inmediatamente si un comando falla
 set -ex
 
 echo "====================================="

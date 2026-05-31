@@ -1,5 +1,5 @@
 #!/bin/bash
-
+set -ex
 echo "====================================="
 echo " LIMPIEZA PREVIA DEL SISTEMA "
 echo "====================================="
