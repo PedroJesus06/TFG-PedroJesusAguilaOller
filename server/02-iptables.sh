@@ -1,53 +1,38 @@
 #!/bin/bash
 set -ex
-
 echo "====================================="
 echo " LIMPIANDO REGLAS ANTERIORES "
 echo "====================================="
 
-# Elimina todas las reglas actuales de la tabla FILTER
+# Elimina todas las reglas activas de la tabla FILTER
 sudo iptables -F
 
 # Elimina cadenas personalizadas creadas anteriormente
 sudo iptables -X
 
-# Reinicia contadores de paquetes y tráfico
+# Reinicia los contadores de tráfico y paquetes
 sudo iptables -Z
 
-# Limpia reglas de la tabla NAT
+# Elimina reglas de traducción NAT
 sudo iptables -t nat -F
 
-# Limpia reglas de la tabla MANGLE
+# Elimina reglas especiales de manipulación de paquetes
 sudo iptables -t mangle -F
 
 
 echo "====================================="
-echo " CONFIGURANDO POLITICAS POR DEFECTO "
+echo " CONFIGURANDO TRAFICO LOCAL "
 echo "====================================="
 
-# Bloquea todo el tráfico entrante por defecto
-sudo iptables -P INPUT DROP
-
-# Bloquea el reenvío de paquetes
-sudo iptables -P FORWARD DROP
-
-# Permite todas las conexiones salientes
-sudo iptables -P OUTPUT ACCEPT
-
-
-echo "====================================="
-echo " PERMITIENDO TRAFICO LOCAL "
-echo "====================================="
-
-# Permite tráfico interno del propio servidor (localhost)
+# Permite el tráfico interno del propio servidor (localhost)
 sudo iptables -A INPUT -i lo -j ACCEPT
 
 
 echo "====================================="
-echo " PERMITIENDO CONEXIONES ESTABLECIDAS "
+echo " PERMITIENDO CONEXIONES ACTIVAS "
 echo "====================================="
 
-# Permite paquetes pertenecientes a conexiones ya iniciadas
+# Permite conexiones ya iniciadas y respuestas relacionadas
 sudo iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
 
 
@@ -55,55 +40,61 @@ echo "====================================="
 echo " CONFIGURANDO SSH "
 echo "====================================="
 
-# Permite acceso SSH remoto al servidor
+# Permite conexiones SSH remotas al servidor
 sudo iptables -A INPUT -p tcp --dport 22 -j ACCEPT
 
 
 echo "====================================="
-echo " CONFIGURANDO IP AUTORIZADA "
+echo " CONFIGURANDO SERVIDOR WEB "
 echo "====================================="
 
-# Define la IP autorizada para acceder a la aplicación web
-IP_AUTORIZADA="192.168.1.50"
+# Permite tráfico HTTP para acceder a la aplicación web
+sudo iptables -A INPUT -p tcp --dport 80 -j ACCEPT
 
-
-echo "====================================="
-echo " CONFIGURANDO ACCESO WEB "
-echo "====================================="
-
-# Permite acceso HTTP únicamente desde la IP autorizada
-sudo iptables -A INPUT -p tcp -s $IP_AUTORIZADA --dport 80 -j ACCEPT
-
-# Permite acceso HTTPS únicamente desde la IP autorizada
-sudo iptables -A INPUT -p tcp -s $IP_AUTORIZADA --dport 443 -j ACCEPT
+# Permite tráfico HTTPS para conexiones seguras
+sudo iptables -A INPUT -p tcp --dport 443 -j ACCEPT
 
 
 echo "====================================="
 echo " BLOQUEANDO MYSQL EXTERNO "
 echo "====================================="
 
-# Bloquea cualquier intento de acceso externo al puerto MySQL
+# Bloquea cualquier acceso externo al puerto MySQL
 sudo iptables -A INPUT -p tcp --dport 3306 -j DROP
 
 
 echo "====================================="
-echo " PROTECCION CONTRA PING "
+echo " LIMITANDO PETICIONES ICMP "
 echo "====================================="
 
-# Bloquea peticiones ICMP para evitar respuestas a ping
-sudo iptables -A INPUT -p icmp --icmp-type echo-request -j DROP
+# Limita peticiones ping para reducir ataques ICMP
+sudo iptables -A INPUT -p icmp --icmp-type echo-request -m limit --limit 1/s -j ACCEPT
 
 
 echo "====================================="
-echo " INSTALANDO IPTABLES-PERSISTENT "
+echo " APLICANDO POLITICAS DE SEGURIDAD "
 echo "====================================="
 
-# Instala el servicio para mantener reglas tras reinicio
+# Bloquea por defecto cualquier conexión entrante no permitida
+sudo iptables -P INPUT DROP
+
+# Bloquea el reenvío de paquetes entre interfaces
+sudo iptables -P FORWARD DROP
+
+# Permite todas las conexiones salientes del servidor
+sudo iptables -P OUTPUT ACCEPT
+
+
+echo "====================================="
+echo " INSTALANDO PERSISTENCIA "
+echo "====================================="
+
+# Instala el servicio que mantiene las reglas tras reiniciar
 sudo apt install iptables-persistent -y
 
 
 echo "====================================="
-echo " GUARDANDO REGLAS "
+echo " GUARDANDO CONFIGURACION "
 echo "====================================="
 
 # Guarda permanentemente las reglas actuales
@@ -114,11 +105,10 @@ echo "====================================="
 echo " MOSTRANDO REGLAS ACTIVAS "
 echo "====================================="
 
-# Muestra todas las reglas configuradas actualmente
+# Muestra todas las reglas activas del firewall
 sudo iptables -L -n -v
 
 
 echo "====================================="
-echo " FIREWALL CONFIGURADO CORRECTAMENTE "
+echo " FIREWALL CONFIGURADO "
 echo "====================================="
-```
