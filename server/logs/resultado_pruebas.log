@@ -95,3 +95,63 @@ ver_registros.php encontrado
 [9] Verificando bases de datos...
 + mysql -u root -e 'SHOW DATABASES;'
 + grep database_rrhh
++ '[' 1 -eq 0 ']'
++ echo 'ERROR: database_rrhh no existe'
+ERROR: database_rrhh no existe
++ mysql -u root -e 'SHOW DATABASES;'
++ grep database_tienda
++ '[' 1 -eq 0 ']'
++ echo 'ERROR: database_tienda no existe'
+ERROR: database_tienda no existe
++ echo ''
+
++ echo '[10] Verificando tablas RRHH...'
+[10] Verificando tablas RRHH...
++ mysql -u root database_rrhh -e 'SHOW TABLES;'
+ERROR 1049 (42000): Unknown database 'database_rrhh'
++ echo ''
+
++ echo '[11] Verificando tablas TIENDA...'
+[11] Verificando tablas TIENDA...
++ mysql -u root database_tienda -e 'SHOW TABLES;'
+ERROR 1049 (42000): Unknown database 'database_tienda'
++ echo ''
+
++ echo '[12] Verificando backups...'
+[12] Verificando backups...
++ sudo mkdir -p /opt/backups
++ sudo chmod 777 /opt/backups
++ '[' -d /opt/backups ']'
++ echo 'Directorio backups encontrado en el sistema'
+Directorio backups encontrado en el sistema
++ ls -lh /opt/backups
+total 0
++ echo ''
+
++ echo '[13] Verificando almacenamiento...'
+[13] Verificando almacenamiento...
++ df -h
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/root        29G  4.0G   25G  15% /
+tmpfs           2.0G     0  2.0G   0% /dev/shm
+tmpfs           782M  884K  782M   1% /run
+tmpfs           5.0M     0  5.0M   0% /run/lock
+/dev/xvda16     881M  162M  657M  20% /boot
+/dev/xvda15     105M  6.2M   99M   6% /boot/efi
+tmpfs           391M   12K  391M   1% /run/user/1000
++ echo ''
+
++ echo '[14] Verificando memoria RAM...'
+[14] Verificando memoria RAM...
++ free -h
+               total        used        free      shared  buff/cache   available
+Mem:           3.8Gi       1.8Gi       1.5Gi        17Mi       769Mi       2.0Gi
+Swap:             0B          0B          0B
++ echo ''
+
++ echo =======================================
+=======================================
++ echo ' PRUEBAS FINALES COMPLETADAS '
+ PRUEBAS FINALES COMPLETADAS 
++ echo =======================================
+=======================================
