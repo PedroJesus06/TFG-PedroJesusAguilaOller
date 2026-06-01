@@ -1,58 +1,56 @@
 #!/bin/bash
 set -ex
+
 echo "====================================="
 echo " LIMPIEZA PREVIA DEL SISTEMA "
 echo "====================================="
 
-sudo systemctl stop apache2 2>/dev/null
-sudo systemctl stop mysql 2>/dev/null
+# Paramos los servicios (si fallan porque ya están muertos, no pasa nada gracias al || true)
+systemctl stop apache2 || true
+systemctl stop mysql || true
 
-sudo apt purge apache2* -y
-sudo apt purge mysql-server mysql-client mysql-common -y
-sudo apt purge php* -y
+# Purgamos los paquetes explícitamente
+apt-get purge -y apache2* mysql-server mysql-client mysql-common php* || true
+apt-get autoremove -y
+apt-get autoclean -y
 
-sudo apt autoremove -y
-sudo apt autoclean -y
-
-sudo rm -rf /etc/mysql
-sudo rm -rf /var/lib/mysql
-sudo rm -rf /var/www/html/*
+# Borrar los directorios residuales que confunden a dpkg
+rm -rf /etc/apache2
+rm -rf /etc/mysql
+rm -rf /var/lib/mysql
+rm -rf /var/www/html/*
 
 echo "====================================="
 echo " ACTUALIZANDO SISTEMA "
 echo "====================================="
 
-sudo apt update && sudo apt upgrade -y
+apt-get update -y
 
 echo "====================================="
-echo " INSTALANDO STACK LAMP "
+echo " INSTALANDO PAQUETE LAMP Y MÓDULOS "
 echo "====================================="
 
-sudo apt install lamp-server^ -y
-
-echo "====================================="
-echo " INSTALANDO MODULOS EXTRA "
-echo "====================================="
-
-sudo apt install php-mysql php-cli php-curl php-mbstring unzip curl net-tools -y
+# Instalamos explícitamente los paquetes base y los módulos extra de una sola tacada
+apt-get install -y apache2 mysql-server php libapache2-mod-php php-mysql php-cli php-curl php-mbstring unzip curl net-tools
 
 echo "====================================="
 echo " HABILITANDO SERVICIOS "
 echo "====================================="
 
-sudo systemctl enable apache2
-sudo systemctl start apache2
+systemctl enable apache2
+systemctl start apache2
 
-sudo systemctl enable mysql
-sudo systemctl start mysql
+systemctl enable mysql
+systemctl start mysql
 
 echo "====================================="
 echo " VERIFICANDO SERVICIOS "
 echo "====================================="
 
-systemctl status apache2 --no-pager
-systemctl status mysql --no-pager
+# Usamos || true por si fallan al mostrar el status en sistemas muy restringidos
+systemctl status apache2 --no-pager || true
+systemctl status mysql --no-pager || true
 
 echo "====================================="
-echo " INSTALACION COMPLETADA "
+echo " INSTALACIÓN COMPLETADA "
 echo "====================================="

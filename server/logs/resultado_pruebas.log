@@ -49,13 +49,18 @@ Puerto MySQL activo
 + sudo iptables -L
 Chain INPUT (policy DROP)
 target     prot opt source               destination         
+DROP       all  --  anywhere             anywhere             ctstate INVALID
 ACCEPT     all  --  anywhere             anywhere            
 ACCEPT     all  --  anywhere             anywhere             ctstate RELATED,ESTABLISHED
+           tcp  --  anywhere             anywhere             tcp dpt:ssh ctstate NEW recent: SET name: SSH_CHECK side: source mask: 255.255.255.255
+DROP       tcp  --  anywhere             anywhere             tcp dpt:ssh ctstate NEW recent: UPDATE seconds: 60 hit_count: 4 name: SSH_CHECK side: source mask: 255.255.255.255
 ACCEPT     tcp  --  anywhere             anywhere             tcp dpt:ssh
 ACCEPT     tcp  --  anywhere             anywhere             tcp dpt:http
 ACCEPT     tcp  --  anywhere             anywhere             tcp dpt:https
-DROP       tcp  --  anywhere             anywhere             tcp dpt:mysql
-ACCEPT     icmp --  anywhere             anywhere             icmp echo-request limit: avg 1/sec burst 5
+ACCEPT     tcp  --  ec2-100-51-26-144.compute-1.amazonaws.com  anywhere             tcp dpt:zabbix-agent
+ACCEPT     tcp  --  ec2-100-51-26-144.compute-1.amazonaws.com  anywhere             tcp dpt:zabbix-trapper
+ACCEPT     icmp --  anywhere             anywhere             icmp echo-request limit: avg 1/sec burst 4
+LOG        all  --  anywhere             anywhere             limit: avg 5/min burst 5 LOG level debug prefix "IPTABLES-DROP: "
 
 Chain FORWARD (policy DROP)
 target     prot opt source               destination         
@@ -90,69 +95,3 @@ ver_registros.php encontrado
 [9] Verificando bases de datos...
 + mysql -u root -e 'SHOW DATABASES;'
 + grep database_rrhh
-+ '[' 0 -eq 0 ']'
-+ echo 'Base de datos RRHH encontrada'
-Base de datos RRHH encontrada
-+ mysql -u root -e 'SHOW DATABASES;'
-+ grep database_tienda
-+ '[' 0 -eq 0 ']'
-+ echo 'Base de datos TIENDA encontrada'
-Base de datos TIENDA encontrada
-+ echo ''
-
-+ echo '[10] Verificando tablas RRHH...'
-[10] Verificando tablas RRHH...
-+ mysql -u root database_rrhh -e 'SHOW TABLES;'
-Tables_in_database_rrhh
-departamentos
-empleados
-+ echo ''
-
-+ echo '[11] Verificando tablas TIENDA...'
-[11] Verificando tablas TIENDA...
-+ mysql -u root database_tienda -e 'SHOW TABLES;'
-Tables_in_database_tienda
-clientes
-detalles_pedido
-pedidos
-productos
-+ echo ''
-
-+ echo '[12] Verificando backups...'
-[12] Verificando backups...
-+ sudo mkdir -p /opt/backups
-+ sudo chmod 777 /opt/backups
-+ '[' -d /opt/backups ']'
-+ echo 'Directorio backups encontrado en el sistema'
-Directorio backups encontrado en el sistema
-+ ls -lh /opt/backups
-total 0
-+ echo ''
-
-+ echo '[13] Verificando almacenamiento...'
-[13] Verificando almacenamiento...
-+ df -h
-Filesystem      Size  Used Avail Use% Mounted on
-/dev/root        29G  4.0G   25G  15% /
-tmpfs           2.0G     0  2.0G   0% /dev/shm
-tmpfs           782M  896K  781M   1% /run
-tmpfs           5.0M     0  5.0M   0% /run/lock
-/dev/xvda16     881M  162M  657M  20% /boot
-/dev/xvda15     105M  6.2M   99M   6% /boot/efi
-tmpfs           391M   12K  391M   1% /run/user/1000
-+ echo ''
-
-+ echo '[14] Verificando memoria RAM...'
-[14] Verificando memoria RAM...
-+ free -h
-               total        used        free      shared  buff/cache   available
-Mem:           3.8Gi       2.1Gi       377Mi        29Mi       1.6Gi       1.7Gi
-Swap:             0B          0B          0B
-+ echo ''
-
-+ echo =======================================
-=======================================
-+ echo ' PRUEBAS FINALES COMPLETADAS '
- PRUEBAS FINALES COMPLETADAS 
-+ echo =======================================
-=======================================

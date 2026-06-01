@@ -1,6 +1,6 @@
 #!/bin/bash
 set -ex
-
+source ../.env
 
 echo "====================================="
 echo " ASEGURANDO CONEXIÓN ANTES DE LIMPIAR "

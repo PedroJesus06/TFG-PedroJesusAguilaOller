@@ -38,12 +38,9 @@ sudo tee /var/www/html/conexion.php > /dev/null <<EOF
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
-
 \$servername = "localhost";
-
 // Forzamos a que use el usuario exacto con el que se hizo login en la web
 \$username = isset(\$_SESSION["usuario"]) ? \$_SESSION["usuario"] : "asir_user";
-
 // Asignamos la contraseña correspondiente del .env
 if (\$username === "asir_admin") {
     \$password = "${DB_ADMIN_PASS}";
@@ -51,12 +48,9 @@ if (\$username === "asir_admin") {
     \$username = "asir_user"; // Aseguramos limpieza en el string
     \$password = "${DB_LIMIT_PASS}";
 }
-
 \$database = isset(\$_SESSION["database"]) ? \$_SESSION["database"] : "database_rrhh";
-
 // Intentar la conexión real
 \$conn = new mysqli(\$servername, \$username, \$password, \$database);
-
 // Si falla, nos muestra un diagnóstico completo en el navegador
 if (\$conn->connect_error) {
     die("<b>Error de Conexión en Auditoría:</b><br>" .
