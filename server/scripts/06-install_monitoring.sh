@@ -1,85 +1,90 @@
 #!/bin/bash
-set -ex # 
+
+# Configuramos para mostrar los comandos y finalizar si hay error
+set -ex
+
 source ../.env
 
-
-echo "======================================================="
-echo "   FASE 1: PURGA Y LIMPIEZA DE ENTORNOS PREVIOS        "
-echo "======================================================="
-
-echo "Deteniendo servicios de Zabbix..."
-sudo systemctl stop zabbix-server zabbix-agent apache2 || true
-
-echo "Purgando paquetes antiguos de Zabbix..."
+# Purgamos por completo para asegurar instalación limpia
 sudo apt-get purge -y zabbix-server-mysql zabbix-frontend-php zabbix-apache-conf zabbix-sql-scripts zabbix-agent zabbix-release || true
 sudo apt-get autoremove -y
 
-echo "Eliminando bases de datos previas de Zabbix..."
+# Eliminamos bases de datos e inicios previos usando las variables del .env
 sudo mysql -e "DROP DATABASE IF EXISTS ${Z_DB_NAME};" || true
 sudo mysql -e "DROP USER IF EXISTS '${Z_DB_USER}'@'localhost';" || true
-
-echo "Eliminando rastros de directorios..."
-sudo rm -rf /etc/zabbix /usr/share/zabbix /var/log/zabbix /var/run/zabbix
+sudo mysql -e "DROP USER IF EXISTS 'zbx_monitor'@'localhost';" || true
+sudo rm -rf /etc/zabbix /usr/share/zabbix /var/log/zabbix /var/run/zabbix /var/lib/zabbix/.my.cnf
 
 echo "======================================================="
-echo "   FASE 2: INSTALACIÓN DEL REPOSITORIO Y PACK COMPLETO "
+echo "           INSTALACIÓN DEL REPOSITORIO Y PACKAGES      "
 echo "======================================================="
-
-echo "Configurando repositorio oficial Zabbix ${ZABBIX_VER} LTS..."
+# Usamos las versiones configuradas en tu .env (7.0 y 24.04)
 wget -q "https://repo.zabbix.com/zabbix/${ZABBIX_VER}/ubuntu/pool/main/z/zabbix-release/zabbix-release_${ZABBIX_VER}-1+ubuntu${OS_VER}_all.deb"
 sudo dpkg -i "zabbix-release_${ZABBIX_VER}-1+ubuntu${OS_VER}_all.deb"
 rm "zabbix-release_${ZABBIX_VER}-1+ubuntu${OS_VER}_all.deb"
 
-echo "Actualizando repositorios del sistema..."
 sudo apt-get update -y
-
-echo "Instalando Servidor, Frontend Web y Agente de Zabbix..."
 sudo apt-get install -y zabbix-server-mysql zabbix-frontend-php zabbix-apache-conf zabbix-sql-scripts zabbix-agent
 
 echo "======================================================="
-echo "   FASE 3: CONFIGURACIÓN AUTOMÁTICA DE BASE DE DATOS   "
+echo "           PREPARACIÓN DE LA BASE DE DATOS (MYSQL)     "
 echo "======================================================="
-
-echo "Creando Base de Datos y Usuario para Zabbix..."
+# Creamos la base de datos y los usuarios leyendo directamente del .env
 sudo mysql -e "CREATE DATABASE ${Z_DB_NAME} CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;"
 sudo mysql -e "CREATE USER '${Z_DB_USER}'@'localhost' IDENTIFIED BY '${Z_DB_PASS}';"
 sudo mysql -e "GRANT ALL PRIVILEGES ON ${Z_DB_NAME}.* TO '${Z_DB_USER}'@'localhost';"
+
+# Dejamos listo el usuario interno para que el Agente pueda leer las gráficas de MySQL
+sudo mysql -e "CREATE USER 'zbx_monitor'@'localhost' IDENTIFIED BY '${Z_DB_PASS}';"
+sudo mysql -e "GRANT REPLICATION CLIENT, PROCESS, SHOW DATABASES, SHOW VIEW ON *.* TO 'zbx_monitor'@'localhost';"
 sudo mysql -e "FLUSH PRIVILEGES;"
 
-echo "PERMITIENDO ENRUTAMIENTO DE FUNCIONES (SOLUCIÓN ERROR 1419)..."
-# Activamos temporalmente la confianza en creadores de funciones con privilegios root
+# Evitamos el error 1419 de AWS de forma temporal
 sudo mysql -e "SET GLOBAL log_bin_trust_function_creators = 1;"
 
-echo "Importando el esquema inicial de Zabbix (Esto puede tardar un minuto)..."
-sudo zcat /usr/share/zabbix-sql-scripts/mysql/server.sql.gz | mysql -u "${Z_DB_USER}" -p"${Z_DB_PASS}" "${Z_DB_NAME}"
+# Importamos el esquema (con la contraseña pegada al -p para evitar fallos)
+sudo zcat /usr/share/zabbix-sql-scripts/mysql/server.sql.gz | mysql -u"${Z_DB_USER}" -p"${Z_DB_PASS}" "${Z_DB_NAME}"
 
-echo " RESTAURANDO SEGURIDAD DE FUNCIONES EN MYSQL..."
-# Volvemos a dejar la variable en su estado seguro original por defecto
+# Devolvemos MySQL a su estado seguro predeterminado
 sudo mysql -e "SET GLOBAL log_bin_trust_function_creators = 0;"
 
 echo "======================================================="
-echo "   FASE 4: AJUSTES DE FICHEROS DE CONFIGURACIÓN        "
+echo "   CONFIGURACIÓN DEL SERVIDOR Y DEL AGENTE            "
 echo "======================================================="
 
-echo "Configurando credenciales en zabbix_server.conf..."
+# 4.1 Vinculamos el demonio Zabbix Server con la Base de Datos
 sudo sed -i "s/^DBName=zabbix/DBName=${Z_DB_NAME}/" /etc/zabbix/zabbix_server.conf
 sudo sed -i "s/^DBUser=zabbix/DBUser=${Z_DB_USER}/" /etc/zabbix/zabbix_server.conf
 sudo sed -i "s/^# DBPassword=/DBPassword=${Z_DB_PASS}/" /etc/zabbix/zabbix_server.conf
 
-echo "Configurando zabbix_agentd.conf con variables del .env..."
+# 4.2 Configuración básica del Agente de monitorización
 sudo sed -i "s/^Server=127.0.0.1/Server=${ZABBIX_SERVER_IP}/" /etc/zabbix/zabbix_agentd.conf
 sudo sed -i "s/^ServerActive=127.0.0.1/ServerActive=${ZABBIX_SERVER_IP}/" /etc/zabbix/zabbix_agentd.conf
 sudo sed -i "s/^Hostname=Zabbix server/Hostname=${MONITORED_HOSTNAME}/" /etc/zabbix/zabbix_agentd.conf
 
-echo "Asegurando módulos y reiniciando el ecosistema..."
+# Dejamos las credenciales preparadas para el agente usando los datos del .env
+sudo mkdir -p /var/lib/zabbix
+sudo tee /var/lib/zabbix/.my.cnf > /dev/null <<EOF
+[client]
+user=zbx_monitor
+password=${Z_DB_PASS}
+EOF
+sudo chown zabbix:zabbix /var/lib/zabbix/.my.cnf
+sudo chmod 600 /var/lib/zabbix/.my.cnf
+
+#Descargamos la plantilla directamente desde el Git oficial de Zabbix 7.0
+sudo wget -q -O /etc/zabbix/zabbix_agentd.d/userparameter_mysql.conf https://raw.githubusercontent.com/zabbix/zabbix/release/7.0/templates/db/mysql_agent/userparameter_mysql.conf
+
+echo "======================================================="
+echo "    ARRANQUE DE SERVICIOS                       "
+echo "======================================================="
 sudo a2enmod status >/dev/null 2>&1
 sudo systemctl daemon-reload
 
-# Habilitar y encender todo
 sudo systemctl enable zabbix-server zabbix-agent apache2
 sudo systemctl restart zabbix-server zabbix-agent apache2
 
 echo "======================================================="
-echo "¡ZABBIX DESPLEGADO COMPLETA Y CORRECTAMENTE!"
-echo "    Ya puedes acceder desde: http://127.0.0.1/zabbix"
+echo "    CONFIGURACIÓN INICIAL TERMINADA"
+echo "    Entra en http://100.51.26.144/zabbix para iniciar el asistente web manual."
 echo "======================================================="
